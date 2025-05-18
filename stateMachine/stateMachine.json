@@ -1,0 +1,108 @@
+{
+    "intro": {
+        "message": "안녕하세요. 저는 InviGuard의 AI 상담 챗봇 이음이에요. 직장에서 힘든 일을 겼으셨다면, 편하게 말씀해 주세요. 제가 천천히 도와드릴게요.",
+        "expects": "input_key"
+    },
+    "prompt_general_description": {
+        "message": "최근에 겪으신 불편한 일이 있다면 자유롭게 말씀해 주세요. 형식은 없어도 괜찮아요.",
+        "expects": "text"
+    },
+    "ask_has_file": {
+        "message": "이 상황과 관련해서 증거가 될 수 있는 사진, 녹음 파일이 있으신가요? (yes/no)",
+        "expects": "input_key",
+        "transitions": {
+            "yes": "wait_file_upload",
+            "no": "end_evidence_upload"
+        }
+    },
+    "wait_file_upload": {
+        "message": "사진이나 녹음(오디오) 파일을 첨부해주세요.",
+        "expects": "file",
+        "transitions": {
+            "file_uploaded": "ask_is_textual",
+            "no_file": "wait_file_upload"
+        }
+    },
+    "ask_is_textual": {
+        "message": "사진에 텍스트가 포함되어 있나요? ",
+        "expects": "input_key",
+        "transitions": {
+            "yes": "run_ocr",
+            "no": "no_text_ask_description"
+        }
+    },
+    "run_ocr": {
+        "message": "OCR 실행 중...",
+        "expects": "system", 
+        "transitions": {
+            "ocr_success": "ocr_success_ask_description",
+            "ocr_fail": "ocr_fail_ask_description"
+        }
+    },
+    "no_text_ask_description": {
+        "message": "텍스트가 포함되어 있지 않은 경우 증거에 대한 설명을 입력해주세요. 증거에 대한 설명은 더욱 깊이있는 분석에 도움이 됩니다.",
+        "expects":"text",
+        "transitions": {
+            "description_provided": "end_evidence_upload",
+            "no_description": "confirm_no_description"
+        }
+    },
+    "ocr_success_ask_description": {
+        "message": "OCR을 성공적으로 마쳤습니다. 혹시 사진에 대해 추가로 설명해주실 내용이 있나요? 설명은 더욱 깊이있는 분석에 도움이 됩니다.",
+        "expects":"text",
+        "transitions": {
+            "description_provided": "end_evidence_upload",
+            "no_description": "end_evidence_upload"
+        }
+    },
+    "ocr_fail_ask_description": {
+        "message": "OCR에 실패했습니다. 증거에 대한 설명을 입력해주세요. 증거에 대한 설명은 더욱 깊이있는 분석에 도움이 됩니다.",
+        "expects":"text",
+        "transitions": {
+            "description_provided": "end_evidence_upload",
+            "no_description": "confirm_no_description"
+        }
+    },
+    "confirm_no_description": {
+        "message": "설명을 생략하고 다음 단계로 넘어가시겠어요? 텍스트가 없거나 OCR에 실패한 사진 증거는 설명이 생략된 경우 전체 분석에 포함되지 않지만, 신고에는는 포함할 수 있습니다. (yes/no)",
+        "expects": "input_key",
+        "transitions": {
+            "yes": "end_evidence_upload",
+            "no": "ask_description"
+        }
+    },
+    "ask_description": {
+        "message": "증거에 대한 설명을 입력해주세요. 증거에 대한 설명은 더욱 깊이있는 분석에 도움이 됩니다.",
+        "expects":"text",
+        "transitions": {
+            "description_provided": "end_evidence_upload",
+            "no_description": "confirm_no_description"
+        }
+    },
+    "end_evidence_upload": {
+        "message": "잘 받았어요! 자료는 안전하게 보관됩니다.",
+        "expects": "none"
+    },
+    "review_before_evaluation": {
+        "message": "지금까지 보내주신 내용으로 바로 사내 괴롭힘 분석을 진행하실 수 있습니다. 더 추가하고 싶으신 내용이 있나요? (사진·음성 증거 더 추가하기 버튼 & 상황 설명 추가로 입력하기 버튼 & 분석 시작하기 버튼)",
+        "expects": "input_key",
+        "transitions": {
+            "additional_evidence_upload": "wait_file_upload",
+            "additional_description": "prompt_additional_description",
+            "start_evaluation": "start_evaluation"
+        }
+    },
+    "prompt_additional_description": {
+        "message": "상황 설명에 추가하실 내용을 입력해주세요.",
+        "expects": "text",
+        "transitions": {
+            "description_provided": "review_before_evaluation",
+            "no_description": "review_before_evaluation"
+        }
+    },
+    "start_evaluation": {
+        "message": "채팅 내역을 토대로 사내 괴롭힘 분석을 시작합니다.",
+        "expects": null,
+        "transitions": {}
+    }
+}
