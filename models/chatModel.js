@@ -122,14 +122,35 @@ async function updateCurrentStep(session_id, newStep) {
 }
 
 // 증거 파일 저장
-async function insertEvidence({ sessionId, filePath, fileType, isTextual, ocrText, description }) {
+async function insertEvidence({ chat_session_id, file_path, file_type, is_textual, ocr_text, evidence_description }) {
     const [result] = await db.query(
         `INSERT INTO Evidence (chat_session_id, file_path, file_type, is_textual, ocr_text, evidence_description, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-        [sessionId, filePath, fileType, isTextual, ocrText, description]
+        [chat_session_id, file_path, file_type, is_textual, ocr_text, evidence_description]
     );
     return result.insertId;
 }
+
+// 증거 파일 is_textual인지 user input받고 boolean 저장
+async function updateEvidenceTextuality(evidence_id, is_textual) {
+    const query = `
+        UPDATE Evidence
+        SET is_textual = ?
+        WHERE evidence_id = ?
+    `;
+    await db.query(query, [is_textual, evidence_id]);
+}
+
+// 증거 파일 evidence_description user한테 입력받고 저장
+async function updateEvidenceDescription(evidence_id, evidence_description) {
+    const query = `
+        UPDATE Evidence
+        SET evidence_description = ?
+        WHERE evidence_id = ?
+    `;
+    await db.query(query, [evidence_description, evidence_id]);
+}
+
 
 // 챗봇 대화 세션의 current state 받아옴 (state는 sub-step들이 필요한 step에서 어떤 상황인지를 나타냄 e.g. 세션의 current_step:3(증거 제출)일 때 current_state는 'ask_is_textual')
 async function getCurrentState(session_id) {
@@ -148,7 +169,33 @@ async function updateCurrentState(session_id, newState) {
     );
 }
 
+// evidence_id로 evidence 받아옴
+async function getEvidenceById(evidence_id) {
+    const [rows] = await db.query(
+        'SELECT * FROM Evidence WHERE evidence_id = ?',
+        [evidence_id]
+    );
+    return rows[0]; 
+}
 
+async function updateEvidenceOCRText(evidence_id, ocrText) {
+    await db.query(
+        `UPDATE Evidence SET ocr_text = ? WHERE evidence_id = ?`,
+        [ocrText, evidence_id]
+    );
+}
+
+// 특정 세션에 제출된 증거 파일 목록 조회
+async function fetchEvidenceBySessionId(session_id) {
+    const [rows] = await db.query(
+        `SELECT evidence_id, chat_session_id AS session_id, file_path, file_type, is_textual, ocr_text, evidence_description, timestamp
+            FROM Evidence
+            WHERE chat_session_id = ?
+            ORDER BY timestamp ASC`,
+        [session_id]
+    );
+    return rows;
+}
 
 
 module.exports = {
@@ -164,5 +211,10 @@ module.exports = {
     updateCurrentStep,
     getCurrentState,
     updateCurrentState,
-    insertEvidence
+    insertEvidence,
+    updateEvidenceTextuality,
+    updateEvidenceDescription,
+    getEvidenceById,
+    updateEvidenceOCRText,
+    fetchEvidenceBySessionId
 };

@@ -1,5 +1,5 @@
 const chatModel = require('../models/chatModel');
-// const runOCR = require('../services/ocrService'); // 임시로 적어두기, 실제로 OCR 테스팅하진 않음
+const runOCR = require('../services/ocrService'); // 임시로 적어두기, 실제로 OCR 테스팅하진 않음
 const path = require('path');
 const chatService = require('../services/chatService.js')
 
@@ -82,38 +82,112 @@ exports.getChatMessages = async (req, res) => {
 // 증거 파일 업로드
 exports.uploadEvidence = async (req, res) => {
     try {
-        const { message_id } = req.params;
-        const { is_textual, evidence_description } = req.body;
+        const { session_id } = req.params;
         const file = req.file;
 
         if (!file) {
-            return res.status(400).json({ message: '업로드된 파일이 없습니다.'});
-        }
-
-        // 해당 message_id로 session_id 확인
-        const session_id = await chatModel.getSessionIdByMessageId(message_id);
-        if (!session_id) {
-            return res.status(400).json({ message: 'Invalid message_id: session not found.' });
-        }
-
-        const currentState = await chatModel.getCurrentState(session_id);
-        if (currentState !== 'wait_file_upload') {
-            return res.status(400).json({ message: 'File upload is not allowed in the current state.' });
+            return res.status(400).json({ message: 'No file uploaded.' });
         }
 
         const result = await chatService.uploadEvidence({
-            message_id,
-            is_textual,
-            evidence_description,
+            session_id,
             file
         });
 
         res.status(201).json(result);
     } catch (error) {
         console.error('Error uploading evidence:', error);
-        res.status(500).json({ message: error.messsage || 'Server error' });
+        res.status(500).json({ message: error.message || 'Server error' });
     }
 };
+
+// 증거 파일 is_textual인지 user input받고 저장 (is_textual은 boolean이어야 함)
+exports.updateEvidenceTextuality = async (req, res) => {
+    try {
+        const { evidence_id } = req.params;
+        const { is_textual } = req.body;
+
+        if (typeof is_textual !== 'boolean') {
+            return res.status(400).json({ message: 'is_textual must be a boolean.' });
+        }
+
+        await chatModel.updateEvidenceTextuality(evidence_id, is_textual);
+        res.status(200).json({ message: 'Textuality updated successfully.' });
+    } catch (error) {
+        console.error('Error updating textuality:', error);
+        res.status(500).json({ message: error.message || 'Server error' });
+    }
+};
+
+// 증거 파일 evidence_description user한테 입력받고 저장
+exports.updateEvidenceDescription = async (req, res) => {
+    try {
+        const { evidence_id } = req.params;
+        const { evidence_description } = req.body;
+
+        if (!evidence_description || typeof evidence_description !== 'string') {
+            return res.status(400).json({ message: 'Valid evidence description is required.' });
+        }
+
+        await chatModel.updateEvidenceDescription(evidence_id, evidence_description);
+        res.status(200).json({ message: 'Evidence description updated successfully.' });
+    } catch (error) {
+        console.error('Error updating evidence description:', error);
+        res.status(500).json({ message: error.message || 'Server error' });
+    }
+};
+
+// 이미지 증거 OCR하고 결과 ocr_text필드에 저장
+exports.runOCROnEvidence = async (req, res) => {
+    try {
+        const { evidence_id } = req.params;
+        if (!evidence_id) {
+            return res.status(400).json({ message: 'evidence_id is required' });
+        }
+
+        // 1. 증거의 file path 찾기
+        const evidence = await chatModel.getEvidenceById(evidence_id);
+        if (!evidence || !evidence.file_path) {
+            return res.status(404).json({ message: 'Evidence not found or file path missing' });
+        }
+
+        // 2. OCR 실행
+        const text = await runOCR(evidence.file_path);
+        if (!text || text.length === 0) {
+            return res.status(200).json({ message: 'No text extracted from image.' });
+        }
+
+        // 3. OCR 결과 DB에 저장
+        await chatModel.updateEvidenceOCRText(evidence_id, text);
+
+        return res.status(200).json({
+            message: 'OCR successful',
+            ocr_text: text
+        });
+
+    } catch (error) {
+        console.error('Error running OCR:', error);
+        res.status(500).json({ message: 'OCR failed' });
+    }
+};
+
+// 특정 세션에 제출된 증거 파일 목록 조회
+exports.getEvidenceBySession = async (req, res) => {
+    try {
+        const { session_id } = req.params;
+        if (!session_id) {
+            return res.status(400).json({ message: 'session_id is required' });
+        }
+
+        const evidenceList = await chatService.getEvidenceBySession(session_id);
+        res.status(200).json(evidenceList);
+    } catch (error) {
+        console.error('Error fetching evidence:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+
 
 // 챗봇 자동 메세지 조회 - step 기준
 exports.getBotMessageByStep = async (req, res) => {

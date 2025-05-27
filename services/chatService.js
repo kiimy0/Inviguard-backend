@@ -1,7 +1,6 @@
-const session = require('express-session');
 const chatModel = require('../models/chatModel');
-// const runOCR = require('./ocrService');
 const stateManager = require('../stateMachine/stateManager');
+// const tesseract = require("node-tesseract-ocr");
 
 // 세션 생성, 처음에 보낼 챗봇 메시지를 세션에 저장하고 return
 exports.createChatSession = async (user_id) => {
@@ -76,33 +75,38 @@ exports.getChatMessages = async (session_id, sender) => {
 };
 
 // 증거 업로드
-exports.uploadEvidence = async ({ message_id, evidence_description, file }) => {
-    const session_id = await chatModel.getSessionIdByMessageId(message_id);
-    if (!session_id) throw new Error('Invalid message_id');
+exports.uploadEvidence = async ({ session_id, file }) => {
+    if (!file) throw new Error('File is required');
     
-    const filePath = file.path;
-    const fileType = file.mimetype;
-    const timestamp = new Date();
+    const file_path = file.path;
+    const file_type = file.mimetype;
     
     const evidenceId = await chatModel.insertEvidence({
-        session_id,
-        filePath,
-        fileType,
-        is_textual: null, // 'ask_if_textual' state에서 is_textual(yes/no)인지 받아야 함
-        ocrText: null,
-        description: evidence_description || null,
-        timestamp
+        chat_session_id: Number(session_id),
+        file_path,
+        file_type,
+        is_textual: null,         // 추후 user input받고 업데이트
+        ocr_text: null,            // OCR 후에 업데이트
+        evidence_description: null,        // 추후 user input받고 업데이트
     });
     
+    const timestamp = new Date(); // 여기서 생성된 timestamp가 evidence 저장할 때 필드 값으로 쓰이진 않지만 return값으로 시간 정보 주기 위해 추가
+
     return {
         evidence_id: evidenceId,
         session_id,
-        file_path: filePath,
-        file_type: fileType,
-        evidence_description: evidence_description || null,
+        file_path: file_path,
+        file_type: file_type,
         timestamp
     };
 };
+
+// 특정 세션에 제출된 증거 파일 목록 조회
+exports.getEvidenceBySession = async (session_id) => {
+    const evidenceList = await chatModel.fetchEvidenceBySessionId(session_id);
+    return evidenceList;
+};
+
 
 // state/step progression까지 될 수 있게 쓴 saveChatMessage, uploadEvidence 함수. 복잡해지고 증거 파일처럼 여러 단계로 필드에 대한 데이터 받아야하는 request에는 오류가 많아서 사용 X
 // exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
