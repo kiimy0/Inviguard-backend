@@ -19,6 +19,11 @@ router.post('/sessions/:session_id/messages', chatController.saveChatMessage);
 router.get('/bot-message/step/:step', chatController.getBotMessageByStep);
 router.get('/bot-message/state/:state', chatController.getBotMessageByState);
 
+
+// 세션 current step/state 업데이트
+router.patch('/sessions/:session_id/step', chatController.updateCurrentStep);
+router.patch('/sessions/:session_id/state', chatController.updateCurrentState);
+
 // 세션 대화 복원
 router.get('/sessions/:session_id/messages', chatController.getChatMessages);
 
@@ -36,5 +41,11 @@ router.put('/evidence/:evidence_id/ocr', chatController.runOCROnEvidence);
 
 // 특정 세션에 제출된 증거 파일 목록 조회
 router.get('/sessions/:session_id/evidence', chatController.getEvidenceBySession);
+
+// 다음 state 받기
+router.get('/state/next', chatController.getNextState);
+
+// state 정보 받아오기
+router.get('/state/:stateName', chatController.getStateInfo);
 
 module.exports = router;

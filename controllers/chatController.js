@@ -2,6 +2,8 @@ const chatModel = require('../models/chatModel');
 const runOCR = require('../services/ocrService'); // 임시로 적어두기, 실제로 OCR 테스팅하진 않음
 const path = require('path');
 const chatService = require('../services/chatService.js')
+const stateManager = require('../stateMachine/stateManager');
+
 
 
 // 챗봇 대화 세션 생성
@@ -229,3 +231,75 @@ exports.getBotMessageByState = async (req, res) => {
     }
 };
 
+
+// current step 업데이트
+exports.updateCurrentStep = async (req, res) => {
+    try {
+        const { session_id } = req.params;
+        const { newStep } = req.body;
+
+        if (!newStep) {
+            return res.status(400).json({ message: 'newStep is required.' });
+        }
+
+        const result = await chatService.updateCurrentStep(session_id, newStep);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error updating step:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// current state 업데이트
+exports.updateCurrentState = async (req, res) => {
+    try {
+        const { session_id } = req.params;
+        const { newState } = req.body;
+
+        if (!newState) {
+            return res.status(400).json({ message: 'newState is required.' });
+        }
+
+        const result = await chatService.updateCurrentState(session_id, newState);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Error updating state:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// 다음 state 받기 (endpoint 구체적인 예시: GET /api/chat/state/next?currentState=ask_is_textual&input=yes)
+exports.getNextState = (req, res) => {
+    const { currentState, input } = req.query;
+
+    if (!currentState || !input) {
+        return res.status(400).json({ message: 'currentState and input are required.' });
+    }
+
+    try {
+        const nextState = stateManager.getNextState(currentState, input);
+        if (!nextState) {
+            return res.status(404).json({ message: 'Next state not found.' });
+        }
+        res.status(200).json({ nextState });
+    } catch (error) {
+        console.error('Error determining next state:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// state 정보 받아오기
+exports.getStateInfo = (req, res) => {
+    const { stateName } = req.params;
+
+    try {
+        const state = stateManager.getStateMetadata(stateName);
+        if (!state) {
+            return res.status(404).json({ message: 'State not found.' });
+        }
+        res.status(200).json(state);
+    } catch (error) {
+        console.error('Error fetching state info:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

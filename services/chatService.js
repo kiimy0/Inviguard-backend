@@ -108,6 +108,19 @@ exports.getEvidenceBySession = async (session_id) => {
 };
 
 
+// current step 업데이트
+exports.updateCurrentStep = async (session_id, newStep) => {
+    await chatModel.updateCurrentStep(session_id, newStep);
+    return { success: true, message: `Step updated to ${newStep}` };
+};
+
+// current state 업데이트
+exports.updateCurrentState = async (session_id, newState) => {
+    await chatModel.updateCurrentState(session_id, newState);
+    return { success: true, message: `State updated to ${newState}` };
+};
+
+
 // state/step progression까지 될 수 있게 쓴 saveChatMessage, uploadEvidence 함수. 복잡해지고 증거 파일처럼 여러 단계로 필드에 대한 데이터 받아야하는 request에는 오류가 많아서 사용 X
 // exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
 //     if (!timestamp || (!content && !inputKey)) {
@@ -268,3 +281,5 @@ exports.getEvidenceBySession = async (session_id) => {
 //         ...result
 //     };
 // };
+
+// 팀원이 백엔드에서 자동으로 챗봇 메세지를 주는 코드가 주석처리 되어있어서 프론트에 챗봇 응답이 안 보인다고 하는데, 증거 분석 같이 여러 단계가 필요한 유저 인풋을 받을 때는 오류가 많이 나고 복잡해져서 유저 메세지 저장과 동시에 state progression이 되지 않고, saveChatMessage는 단순히 유저메세지를 저장하고, 챗봇 메세지는 getBotMessageByStep/getBotMessageByState로 받아오는 것으로 했잖아? 이게 주석에 적혀 있는데 왜 이해를 못했을까? 각 기능을 따로 분리시켜놓고 state/step progression은 프런트 로직으로 구현해야 할 필요성을 적어줘. 아니면 백엔드가 맡아야 하는 일이야?
