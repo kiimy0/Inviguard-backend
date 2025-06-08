@@ -273,14 +273,14 @@ exports.updateCurrentState = async (req, res) => {
 
 // 다음 state 받기 (endpoint 구체적인 예시: GET /api/chat/state/next?currentState=ask_is_textual&input=yes)
 exports.getNextState = (req, res) => {
-    const { currentState, input } = req.query;
+    const { currentState, input, systemEvent } = req.query;
 
-    if (!currentState || !input) {
-        return res.status(400).json({ message: 'currentState and input are required.' });
+    if (!currentState || (!input && !systemEvent)) {
+        return res.status(400).json({ message: 'currentState and input or systemEvent are required.' });
     }
 
     try {
-        const nextState = stateManager.getNextState(currentState, input);
+        const nextState = stateManager.getNextState(currentState, input, systemEvent);
         if (!nextState) {
             return res.status(404).json({ message: 'Next state not found.' });
         }
@@ -482,19 +482,6 @@ exports.analyzeMessage = async (req, res) => {
         res.status(500).json({ message: "Internal server error." });
     }
 };
-
-
-// 전체 증거, 상황 설명 메세지 분석되었는지 확인
-exports.checkAllAnalyzation = async (req, res) => {
-    const { session_id } = req.params;
-    try {
-        const result = await chatService.checkAllAnalyzation(Number(session_id));
-        res.status(201).json(result);
-    } catch (err) {
-        console.error("Error checking analyzation status for session:", err);
-        res.status(500).json({ message: err.message || 'Internal Server Error' });        
-    }
-}
 
 // 전체 세션 괴롭힘 분석 요청
 exports.analyzeSession = async (req, res) => {

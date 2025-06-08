@@ -119,11 +119,6 @@ exports.updateCurrentState = async (session_id, newState) => {
     return { success: true, message: `State updated to ${newState}` };
 };
 
-// 상황 설명 메세지 괴롭힘 분석 요청 (OpenAI API로 분석)
-
-// 전체 증거, 상황 설명 메세지 분석되었는지 확인
-exports.checkAllAnalyzation
-
 // 전체 세션 괴롭힘 분석 요청
 exports.analyzeSession = async (session_id) => {
     const evidenceData = await chatModel.getEvidenceHarassmentBySession(session_id);
