@@ -1,2 +1,12 @@
-# Environments
+# Environments ignore
 .env
+
+# virtual env ignore
+venv/
+
+# pythorch model ignore
+*.pt
+
+# cache ignore
+__pycache__/
+*.pyc
