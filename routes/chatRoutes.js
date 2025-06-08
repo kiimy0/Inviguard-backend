@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chatController');
+const kobertController = require('../controllers/kobertController');
 const upload = require('../middleware/upload');
 
 // 챗봇 대화 세션 생성
@@ -49,7 +50,7 @@ router.get('/state/next', chatController.getNextState);
 router.get('/state/:stateName', chatController.getStateInfo);
 
 // 개별 증거 ocr_text 괴롭힘 분석 요청 (AI모델이 ocr_text필드 분석)
-//router.post('/analysis/evidence/:evidence_id', kobertController.analyzeEvidenceOcr);
+router.post('/analysis/evidence/:evidence_id', kobertController.analyzeOCRText);
 
 // 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
 router.post('/analysis/evidence/openai/:evidence_id', chatController.analyzeEvidenceDescription);

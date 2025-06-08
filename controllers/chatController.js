@@ -307,34 +307,6 @@ exports.getStateInfo = (req, res) => {
     }
 };
 
-// 개별 증거 ocr_text 괴롭힘 분석 요청 (AI모델이 ocr_text필드 분석)
-exports.analyzeEvidenceOcr = async (req, res) => {
-    try {
-        const { evidence_id } = req.params;
-
-        // 1. DB에서 증거 가져오기
-        const evidence = await chatModel.getEvidenceById(evidence_id);
-        // 증거의 ocr_text나 evidence_description이 있는지 체크크
-        if (!evidence || (!evidence.ocr_text && !evidence.evidence_description)) {
-            return res.status(400).json({ message: "Analyzable text not found in evidence." });
-        }
-
-        const text = evidence.ocr_text || evidence.evidence_description;
-
-        // 2. AI 서버로 분석 요청
-        const result = await chatService.analyzeEvidence(text);
-        if (!result) return res.status(500).json({ message: "AI analysis failed." });
-
-        // 3. 분석 결과 저장
-        await chatModel.insertEvidenceHarassment(evidence_id, result);
-
-        res.status(200).json({ message: "Evidence analyzed", result });
-    } catch (err) {
-        console.error("Error analyzing evidence:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
 // 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
 exports.analyzeEvidenceDescription = async (req, res) => {
     const evidence_id = req.params.evidence_id;

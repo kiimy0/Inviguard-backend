@@ -119,8 +119,6 @@ exports.updateCurrentState = async (session_id, newState) => {
     return { success: true, message: `State updated to ${newState}` };
 };
 
-// 개별 증거 ocr_text 괴롭힘 분석 요청 (AI모델이 ocr_text필드 분석)
-
 // 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
 
 // 상황 설명 메세지 괴롭힘 분석 요청 (OpenAI API로 분석)

@@ -26,11 +26,17 @@ exports.analyzeOCRText = async (req, res) => {
 
         // 예측된 괴롭힘 유형들을 EvidenceHarassment table에 저장
         for (const label of types) {    // 괴롭힘 유형 개수만큼 insert
-            await chatModel.insertEvidenceHarassment({
-                evidence_id,
-                category_name: label,   // category_name을 기반으로 내부에서 harassment_category_id 매핑
-                weight: severity        // 모든 유형 같은 심각도 저장(1문장 -> 1심각도)
-            });
+            // category_name(label)을 기반으로 HarassmentCategory를 받아옴
+            const category = await chatModel.getHarassmentCategoryByName(label);
+
+            if (category) {
+                await chatModel.insertEvidenceHarassment({
+                    evidence_id,
+                    harassment_category_id: category.harassment_category_id, // 해당 category의 id
+                    severity: severity,        // 모든 유형 같은 심각도 저장(1문장 -> 1심각도)
+                    is_harassment: harassment // 괴롭힘 여부
+                });
+            }
         }
 
         // client 응답 반환
@@ -38,7 +44,7 @@ exports.analyzeOCRText = async (req, res) => {
             message: 'Analysis complete',   // 분석 완료 message
             harassment,
             types,
-            severity
+            severity,
         });
 
     } catch (err) {
