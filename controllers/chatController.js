@@ -485,7 +485,16 @@ exports.analyzeMessage = async (req, res) => {
 
 
 // 전체 증거, 상황 설명 메세지 분석되었는지 확인
-
+exports.checkAllAnalyzation = async (req, res) => {
+    const { session_id } = req.params;
+    try {
+        const result = await chatService.checkAllAnalyzation(Number(session_id));
+        res.status(201).json(result);
+    } catch (err) {
+        console.error("Error checking analyzation status for session:", err);
+        res.status(500).json({ message: err.message || 'Internal Server Error' });        
+    }
+}
 
 // 전체 세션 괴롭힘 분석 요청
 exports.analyzeSession = async (req, res) => {

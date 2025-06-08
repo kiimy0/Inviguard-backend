@@ -59,7 +59,7 @@ router.post('/analysis/evidence/openai/:evidence_id', chatController.analyzeEvid
 router.post('/analysis/message/openai/:message_id', chatController.analyzeMessage);
 
 // 전체 증거, 상황 설명 메세지 분석되었는지 확인
-// router.get('/analysis/status/:session_id', chatController.checkAllAnalyzation)
+router.get('/analysis/status/:session_id', chatController.checkAllAnalyzation)
 
 // 전체 세션 괴롭힘 분석 요청
 router.post('/analysis/sessions/:session_id', chatController.analyzeSession);
