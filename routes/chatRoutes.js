@@ -44,7 +44,7 @@ router.put('/evidence/:evidence_id/ocr', chatController.runOCROnEvidence);
 router.get('/sessions/:session_id/evidence', chatController.getEvidenceBySession);
 
 // 다음 state 받기
-router.get('/state/next', chatController.getNextState);
+router.post('/state/next', chatController.getNextState);
 
 // state 정보 받아오기
 router.get('/state/:stateName', chatController.getStateInfo);
