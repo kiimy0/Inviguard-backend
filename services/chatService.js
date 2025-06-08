@@ -1,6 +1,5 @@
 const chatModel = require('../models/chatModel');
 const stateManager = require('../stateMachine/stateManager');
-// const tesseract = require("node-tesseract-ocr");
 
 // 세션 생성, 처음에 보낼 챗봇 메시지를 세션에 저장하고 return
 exports.createChatSession = async (user_id) => {
@@ -119,6 +118,73 @@ exports.updateCurrentState = async (session_id, newState) => {
     await chatModel.updateCurrentState(session_id, newState);
     return { success: true, message: `State updated to ${newState}` };
 };
+
+// 개별 증거 ocr_text 괴롭힘 분석 요청 (AI모델이 ocr_text필드 분석)
+
+// 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
+
+// 상황 설명 메세지 괴롭힘 분석 요청 (OpenAI API로 분석)
+
+// 전체 증거, 상황 설명 메세지 분석되었는지 확인
+
+// 전체 세션 괴롭힘 분석 요청
+exports.analyzeSession = async (session_id) => {
+    const evidenceData = await chatModel.getEvidenceHarassmentBySession(session_id);
+    const messageData = await chatModel.getMessageHarassmentBySession(session_id);
+
+    // EvidenceHarassment, ChatMessageHarassment이 있는지 확인 (두 테이블이 있어야 둘을 종합한 세션 분석을 할 수 있기 때문에)
+    if (evidenceData.length === 0 || messageData.length === 0) {
+        throw new Error("Both evidence and message harassment analyses must exist to evaluate the session.");
+    }
+
+    // harassment_category_id별 severity 더하기 (harassment_category_id가 같은 EvidenceHarassment, ChatMessageHarassment)
+    const merged = {};
+    for (const record of [...evidenceData, ...messageData]) {
+        const categoryId = record.harassment_category_id;
+        if (!merged[categoryId]) {
+            merged[categoryId] = 0;
+        }
+        merged[categoryId] += record.severity;
+    }
+
+    // harasssment_category_id별 EvidenceHarassment, ChatMessageHarassment을 종합한 SessionEvalHarassment 테이블 생성
+    const sessionEvalHarassmentRecords = Object.entries(merged).map(([categoryId, severity]) => ({
+        harassment_category_id: Number(categoryId),
+        severity
+    }));
+
+
+    for (const record of sessionEvalHarassmentRecords) {
+        await chatModel.insertSessionEvalHarassment({
+            session_eval_result_id: sessionEvalResultId,
+            harassment_category_id: record.harassment_category_id,
+            severity: record.severity
+        });
+    }
+
+    const hasSeverity = sessionEvalHarassmentRecords.some(r => r.severity >= 0); // 심각도가 0과 같거나 크면
+    const is_harassment = hasSeverity ? 1 : 0;
+    const should_report = is_harassment;  // 일단은 간단하게 괴롭힘이 맞으면 신고 권장하는 것으로...
+    const risk_score = sessionEvalHarassmentRecords.reduce((sum, r) => sum + r.severity, 0); // 위험지수 계산 방법?
+
+    const sessionEvalResultId = await chatModel.insertSessionEvalResult({
+        session_id,
+        risk_score,
+        is_harassment,
+        should_report
+    });
+
+    return {
+        session_eval_result_id: sessionEvalResultId,
+        risk_score,
+        is_harassment,
+        should_report,
+        details: sessionEvalHarassmentRecords
+    };
+};
+
+
+
 
 
 // state/step progression까지 될 수 있게 쓴 saveChatMessage, uploadEvidence 함수. 복잡해지고 증거 파일처럼 여러 단계로 필드에 대한 데이터 받아야하는 request에는 오류가 많아서 사용 X

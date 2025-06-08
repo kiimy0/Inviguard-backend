@@ -48,4 +48,21 @@ router.get('/state/next', chatController.getNextState);
 // state 정보 받아오기
 router.get('/state/:stateName', chatController.getStateInfo);
 
+// 개별 증거 ocr_text 괴롭힘 분석 요청 (AI모델이 ocr_text필드 분석)
+//router.post('/analysis/evidence/:evidence_id', kobertController.analyzeEvidenceOcr);
+
+// 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
+router.post('/analysis/evidence/openai/:evidence_id', chatController.analyzeEvidenceDescription);
+
+// 상황 설명 메세지 괴롭힘 분석 요청 (OpenAI API로 분석)
+router.post('/analysis/message/openai/:message_id', chatController.analyzeMessage);
+
+// 전체 증거, 상황 설명 메세지 분석되었는지 확인
+// router.get('/analysis/status/:session_id', chatController.checkAllAnalyzation)
+
+// 전체 세션 괴롭힘 분석 요청
+router.post('/analysis/sessions/:session_id', chatController.analyzeSession);
+
+
+
 module.exports = router;
