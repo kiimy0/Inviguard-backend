@@ -218,16 +218,12 @@ exports.getBotMessageByStep = async (req, res) => {
 exports.getBotMessageByState = async (req, res) => {
     try {
         const { state } = req.params;
-        if (!state) {
-            return res.status(400).json({ message: 'State parameter is required.' });
-        }
+        const metadata = stateManager.getStateMetadata(state);
 
-        const message = await chatModel.getBotAutoMessageByState(state);
-        if (!message) {
-            return res.status(404).json({ message: 'Bot message not found for this state.' });
+        if (!metadata || !metadata.message) {
+            return res.status(404).json({ message: 'Bot message not found for this state.'});
         }
-
-        res.status(200).json(message);
+        res.status(200).json({ content: metadata.message, state });
     } catch (error) {
         console.error('Error fetching bot message by state:', error);
         res.status(500).json({ message: 'Server error' });
