@@ -6,7 +6,7 @@ async function insertChatSession(user_id, initialStep, initialState) {
 
     // 1. 날짜 포맷: YYYY-MM-DD (시간 생략)
     const dateStr = started_at.toISOString().split('T')[0]; // e.g., "2025-06-13"
-    const session_title = `{dateStr} 채팅`;
+    const session_title = `${dateStr} 채팅`;
 
     // 2. 세션 생성, session_title은 세션 생성 날짜로
     const [result] = await db.query(

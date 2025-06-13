@@ -60,10 +60,10 @@ exports.deleteChatSession = async (req, res) => {
 // 유저가 전송한 메세지 저장
 exports.saveChatMessage = async (req, res) => {
     try {
-        const { content, timestamp, inputKey } = req.body;
+        const { content, timestamp, state } = req.body;
         const { session_id } = req.params;
 
-        const result = await chatService.saveChatMessage(session_id, content, timestamp, inputKey);
+        const result = await chatService.saveChatMessage(session_id, content, timestamp, state);
         res.status(201).json(result);
     } catch (err) {
         console.error('Error saving chat message: ', err);

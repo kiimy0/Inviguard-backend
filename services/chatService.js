@@ -54,8 +54,48 @@ exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
     const actualInput = inputKey || content;
     const currentState = await chatModel.getCurrentState(session_id);
 
+    // state 전이 판단
+    const stateMeta = stateManager.getStateMetadata(currentState);
+
+    // input_key 유형일 경우 입력값 보정
+    const normalizeInputKey = (input) => {
+        const map = {
+            '시작하기': 'start',
+            '예': 'yes',
+            '네': 'yes',
+            '아니요': 'no',
+            '아니오': 'no',
+            '사진·음성 증거 더 추가하기': 'additional_evidence_upload',
+            '상황 설명 추가로 입력하기': 'additional_description',
+            '분석 시작하기': 'start_evaluation'
+        };
+        return map[input.trim()] || input.trim();
+    };
+
+    const transitionKey = stateMeta?.expects === 'text'
+        ? actualInput.trim().length > 0 ? 'description_provided' : 'no_description'
+        : normalizeInputKey(actualInput);
+
+    const nextState = stateManager.getNextState(currentState, transitionKey);
+
     // 유저 메세지 저장
     const messageId = await chatModel.insertChatMessage(session_id, actualInput, timestamp, currentState);
+
+    // 상태 전이 발생 시: 다음 state 및 챗봇 메세지 DB 업데이트
+    if (nextState && nextState !== currentState) {
+        await chatModel.updateCurrentState(session_id, nextState);
+
+        const botMsg = await chatModel.getBotAutoMessageByState(nextState);
+        if (botMsg) {
+            const botTimestamp = new Date();
+            await chatModel.insertBotMessage(session_id, botMsg.content, botTimestamp, nextState);
+            console.log("[DEBUG] Bot message inserted for state:", nextState);
+        } else {
+            console.warn("[DEBUG] No bot message found for state:", nextState);
+        }
+    } else {
+        console.log("[DEBUG] No state transition occurred or nextState equals currentState");
+    }
 
     return {
         user_message: {
@@ -63,10 +103,12 @@ exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
             session_id: parseInt(session_id),
             sender: 'user',
             content: actualInput,
-            timestamp
+            timestamp,
+            state: currentState
         }
     };
 };
+
 
 // 특정 세션에 보내진 메세지 받아오기
 exports.getChatMessages = async (session_id, sender) => {
