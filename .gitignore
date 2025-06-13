@@ -10,3 +10,6 @@ venv/
 # cache ignore
 __pycache__/
 *.pyc
+
+# env ignore
+.env

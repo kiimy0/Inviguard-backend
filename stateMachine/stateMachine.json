@@ -1,11 +1,18 @@
 {
     "intro": {
         "message": "안녕하세요. 저는 InviGuard의 AI 상담 챗봇 이음이에요. 직장에서 힘든 일을 겼으셨다면, 편하게 말씀해 주세요. 제가 천천히 도와드릴게요.",
-        "expects": "input_key"
+        "expects": "input_key",
+        "transitions": {
+            "yes": "prompt_general_description",
+            "default": "prompt_general_description"
+        }
     },
     "prompt_general_description": {
         "message": "최근에 겪으신 불편한 일이 있다면 자유롭게 말씀해 주세요. 형식은 없어도 괜찮아요.",
-        "expects": "text"
+        "expects": "text",
+        "transitions": {
+            "description_provided": "ask_has_file"
+        }
     },
     "ask_has_file": {
         "message": "이 상황과 관련해서 증거가 될 수 있는 사진, 녹음 파일이 있으신가요? (yes/no)",

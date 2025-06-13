@@ -13,7 +13,7 @@ function getStateMessage(stateKey) {
 function getNextState(currentState, userInput) {
     const state = stateMachine[currentState];
     if (!state || !state.transitions) return null;
-    return state.transitions[userInput] || null;
+    return state.transitions[userInput] || state.transitions["default"] || null;
 }
 
 
