@@ -4,24 +4,18 @@ const db = require('../config/db.js');
 async function insertChatSession(user_id, initialStep, initialState) {
     const started_at = new Date();
 
-    // 1. 세션 생성, session_title은 세션 아이디 받기 전에는 임시 제목(세션 제목 생성 중)으로 설정
+    // 1. 날짜 포맷: YYYY-MM-DD (시간 생략)
+    const dateStr = started_at.toISOString().split('T')[0]; // e.g., "2025-06-13"
+    const session_title = `{dateStr} 채팅`;
+
+    // 2. 세션 생성, session_title은 세션 생성 날짜로
     const [result] = await db.query(
         `INSERT INTO ChatSession (user_id, session_title, started_at, current_step, current_state) 
         VALUES (?, ?, ?, ?, ?)`,
-        [user_id, '세션 제목 생성 중', started_at, initialStep, initialState]
+        [user_id, session_title, started_at, initialStep, initialState]
     );
 
-    const session_id = result.insertId;  // 생성된 session id를 return (insertId 속성으로 INSERT문 실행 후 삽입된 행의 ID를 얻을 수 있음)
-
-    // 2. 세션 제목 "세션 {session_id}"로 업데이트 (session_id에 생성된 session id를 받았으므로)
-    const newTitle = `session ${session_id}`;
-    await db.query(
-        `UPDATE ChatSession
-        SET session_title = ?
-        WHERE chat_session_id = ?`,
-        [newTitle, session_id]
-    );
-    return session_id;
+    return result.insertId;  // 생성된 session id를 return (insertId 속성으로 INSERT문 실행 후 삽입된 행의 ID를 얻을 수 있음)
 }
 
 // 모든 챗봇 대화 세션 fetch
