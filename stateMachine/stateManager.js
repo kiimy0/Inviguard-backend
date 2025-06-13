@@ -48,6 +48,10 @@ function getNextState(currentState, userInput, systemEvent = null) {
     if (state.expects === 'input_key') {
         return state.transitions?.[userInput] || null;
     }
+
+    if (state.expects === 'none') {
+        return systemEvent ? (state.transitions?.[systemEvent] || null) : null;
+    }
 }
 
 function getStateMetadata(stateName) {
