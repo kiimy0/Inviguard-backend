@@ -187,11 +187,40 @@ exports.analyzeSession = async (session_id) => {
         severity
     }));
 
-    const hasSeverity = sessionEvalHarassmentRecords.some(r => r.severity >= 0); // 심각도가 0과 같거나 크면
+    const hasSeverity = sessionEvalHarassmentRecords.some(r => r.severity >= 0); // 심각도가 0과 같거나 크면 '심각성'이 있다고 판단
     const is_harassment = hasSeverity ? 1 : 0;
     const should_report = is_harassment;  // 일단은 간단하게 괴롭힘이 맞으면 신고 권장하는 것으로...
-    const risk_score = sessionEvalHarassmentRecords.reduce((sum, r) => sum + r.severity, 0); // 위험지수 계산 방법?
 
+    // 유형별 위험성에 따라 weight 부여
+    const harassmentTypeWeights = {
+        SEXUAL: 12, VIOLENCE: 12, CRIME: 12,
+        ABUSE: 9, VERBAL_ATTACK: 9, DISCRIMINATION: 9, HATE: 9,
+        INAPPROPRIATE_HR_ACTION: 9, ECONOMIC_PRESSURE: 9,
+        CENSURE: 6, EXCESSIVE_WORKLOAD: 6, UNFAIR_WORK_ORDERS: 6,
+        WORK_EXCLUSION: 6, OBSTRUCTION_OF_WORK: 6, SOCIAL_ISOLATION: 6
+    };
+
+    let raw_score = 0;
+    for (const record of sessionEvalHarassmentRecords) {
+        const category = await chatModel.getHarassmentCategoryById(record.harassment_category_id);
+        const type = category?.name;
+
+        const type_weight = harassmentTypeWeights[type] || 0;
+        const severity_multiplier = record.severity === 1 ? 2.5 : // 심각도가 1(명백한 괴롭힘)이면 2.5를 곱함
+                                record.severity === 0 ? 1 : // 심각도가 0(불쾌감 유발 가능)이면 1을 곱함
+                                0;
+        // sessionEvalHarassment별 type_weight와 severity_weight를 곱한 값을 risk_score에 더함.
+        raw_score += type_weight * severity_multiplier;
+    }
+
+    // 괴롭힘 유형의 개수를 반영하기 위한 escalation_factor 변수
+    let escalation_factor = 1.0;
+    if (sessionEvalHarassmentRecords.length >= 5) escalation_factor = 1.3;
+    else if (sessionEvalHarassmentRecords.length >= 3) escalation_factor = 1.15;
+
+    let risk_score = Math.round(Math.min(raw_score * escalation_factor, 100)); // 100점 만점, 100점이 가장 위험도가 높은 것으로
+
+    // SessionEvalResult 레코드 생성
     const sessionEvalResultId = await chatModel.insertSessionEvalResult({
         session_id,
         risk_score,
@@ -199,6 +228,7 @@ exports.analyzeSession = async (session_id) => {
         should_report
     });
 
+    // SessionEvalHarassment 레코드들 생성 (session_eval_result_id를 fk로 가지므로 SessionEvalResult 생성 후에 만들어짐)
     for (const record of sessionEvalHarassmentRecords) {
         await chatModel.insertSessionEvalHarassment({
             session_eval_result_id: sessionEvalResultId,

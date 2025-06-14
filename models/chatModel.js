@@ -201,6 +201,15 @@ async function getHarassmentCategoryByName(name) {
     return rows[0];
 }
 
+// 괴롭힘 유형 id로 조회
+async function getHarassmentCategoryById(harassment_category_id) {
+    const [rows] = await db.query(
+        "SELECT * FROM HarassmentCategory WHERE harassment_category_id = ?",
+        [harassment_category_id]
+    );
+    return rows[0];
+}
+
 // EvidenceHarassment 생성
 async function insertEvidenceHarassment({ evidence_id, harassment_category_id, severity, is_harassment }) {
     await db.query(
@@ -300,6 +309,7 @@ module.exports = {
     updateEvidenceOCRText,
     fetchEvidenceBySessionId,
     getHarassmentCategoryByName,
+    getHarassmentCategoryById,
     insertEvidenceHarassment,
     getEvidenceHarassmentBySession,
     getDescriptionMessagesBySessionId,
