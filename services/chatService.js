@@ -187,15 +187,6 @@ exports.analyzeSession = async (session_id) => {
         severity
     }));
 
-
-    for (const record of sessionEvalHarassmentRecords) {
-        await chatModel.insertSessionEvalHarassment({
-            session_eval_result_id: sessionEvalResultId,
-            harassment_category_id: record.harassment_category_id,
-            severity: record.severity
-        });
-    }
-
     const hasSeverity = sessionEvalHarassmentRecords.some(r => r.severity >= 0); // 심각도가 0과 같거나 크면
     const is_harassment = hasSeverity ? 1 : 0;
     const should_report = is_harassment;  // 일단은 간단하게 괴롭힘이 맞으면 신고 권장하는 것으로...
@@ -207,6 +198,14 @@ exports.analyzeSession = async (session_id) => {
         is_harassment,
         should_report
     });
+
+    for (const record of sessionEvalHarassmentRecords) {
+        await chatModel.insertSessionEvalHarassment({
+            session_eval_result_id: sessionEvalResultId,
+            harassment_category_id: record.harassment_category_id,
+            severity: record.severity
+        });
+    }
 
     return {
         session_eval_result_id: sessionEvalResultId,
