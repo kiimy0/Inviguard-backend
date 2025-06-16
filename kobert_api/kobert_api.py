@@ -55,7 +55,7 @@ model2.eval()
 model3.eval()
 
 # tokenizer
-tokenizer = AutoTokenizer.from_pretrained("./kobert_tokenizer", use_fast=False)
+tokenizer = AutoTokenizer.from_pretrained("kobert_api/kobert_tokenizer", use_fast=False, local_files_only=True)
 # FastAPI server
 app = FastAPI()
 
