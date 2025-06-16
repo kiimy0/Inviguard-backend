@@ -29,7 +29,9 @@ router.patch('/sessions/:session_id/state', chatController.updateCurrentState);
 router.get('/sessions/:session_id/messages', chatController.getChatMessages);
 
 // 증거 파일 제출 (사진/오디오 파일, request 당 하나의 파일만 업로드)
-router.post('/sessions/:session_id/evidence', upload.single('file'), chatController.uploadEvidence);
+// router.post('/sessions/:session_id/evidence', upload.single('file'), chatController.uploadEvidence);
+// 증거 파일 제출 (여러파일용) -> 임시로 5장 허용
+router.post('/sessions/:session_id/evidence', upload.array('file', 5), chatController.uploadEvidence);
 
 // 증거 파일 is_textual 저장
 router.put('/evidence/:evidence_id/textuality', chatController.updateEvidenceTextuality);

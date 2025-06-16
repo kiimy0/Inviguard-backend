@@ -9,7 +9,7 @@ const db = require('./config/db');
 app.use(express.json()); // JSON parsing할 수 있게
 
 // Routes
-app.use('/api/chat', chatRoutes)
+app.use('/api/chat', chatRoutes);
 
 // DB connection test
 const testDBConnection = async () => {

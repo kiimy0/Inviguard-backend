@@ -55,7 +55,7 @@ model2.eval()
 model3.eval()
 
 # tokenizer
-tokenizer = AutoTokenizer.from_pretrained("./kobert_tokenizer", use_fast=False)
+tokenizer = AutoTokenizer.from_pretrained("kobert_api/kobert_tokenizer", use_fast=False, local_files_only=True)
 # FastAPI server
 app = FastAPI()
 
@@ -83,7 +83,7 @@ def analyze(data: RequestText):
         logits2[5] *= 0.1
         probs2 = torch.sigmoid(logits2)
         # 클래스 별 threshold 설정
-        custom_threshold = [0.25, 0.25, 0.25, 0.25, 0.25, 0.566, 0.25]
+        custom_threshold = [0.25, 0.22, 0.23, 0.25, 0.25, 0.566, 0.25]
         types = [LABELS[i] for i, p in enumerate(probs2) if p > custom_threshold[i]]
 
         print("🔍 logits2:", logits2.tolist())
@@ -93,7 +93,7 @@ def analyze(data: RequestText):
         # head3
         logit3 = model3(input_ids, attention_mask).squeeze() * 0.56
         sigmoid3 = torch.sigmoid(logit3).item()
-        severity = int(sigmoid3 > 0.5)
+        severity = int(sigmoid3 > 0.486)
 
         print("🔍 logit3:", logit3.item(), "| sigmoid:", sigmoid3)
 
