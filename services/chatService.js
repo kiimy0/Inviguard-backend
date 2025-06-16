@@ -1,6 +1,5 @@
 const chatModel = require('../models/chatModel');
 const stateManager = require('../stateMachine/stateManager');
-// const tesseract = require("node-tesseract-ocr");
 
 // 세션 생성, 처음에 보낼 챗봇 메시지를 세션에 저장하고 return
 exports.createChatSession = async (user_id) => {
@@ -57,9 +56,25 @@ exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
 
     // state 전이 판단
     const stateMeta = stateManager.getStateMetadata(currentState);
+
+    // input_key 유형일 경우 입력값 보정
+    const normalizeInputKey = (input) => {
+        const map = {
+            '시작하기': 'start',
+            '예': 'yes',
+            '네': 'yes',
+            '아니요': 'no',
+            '아니오': 'no',
+            '사진·음성 증거 더 추가하기': 'additional_evidence_upload',
+            '상황 설명 추가로 입력하기': 'additional_description',
+            '분석 시작하기': 'start_evaluation'
+        };
+        return map[input.trim()] || input.trim();
+    };
+
     const transitionKey = stateMeta?.expects === 'text'
         ? actualInput.trim().length > 0 ? 'description_provided' : 'no_description'
-        : actualInput;
+        : normalizeInputKey(actualInput);
 
     const nextState = stateManager.getNextState(currentState, transitionKey);
 
@@ -71,12 +86,15 @@ exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
         await chatModel.updateCurrentState(session_id, nextState);
 
         const botMsg = await chatModel.getBotAutoMessageByState(nextState);
-        if (botMsg) { 
-            await chatModel.insertBotMessage(session_id, botMsg.content, new Date(), nextState);
+        if (botMsg) {
+            const botTimestamp = new Date();
+            await chatModel.insertBotMessage(session_id, botMsg.content, botTimestamp, nextState);
             console.log("[DEBUG] Bot message inserted for state:", nextState);
         } else {
             console.warn("[DEBUG] No bot message found for state:", nextState);
         }
+    } else {
+        console.log("[DEBUG] No state transition occurred or nextState equals currentState");
     }
 
     return {
@@ -90,6 +108,7 @@ exports.saveChatMessage = async (session_id, content, timestamp, inputKey) => {
         }
     };
 };
+
 
 // 특정 세션에 보내진 메세지 받아오기
 exports.getChatMessages = async (session_id, sender) => {
@@ -141,6 +160,104 @@ exports.updateCurrentState = async (session_id, newState) => {
     await chatModel.updateCurrentState(session_id, newState);
     return { success: true, message: `State updated to ${newState}` };
 };
+
+// 전체 세션 괴롭힘 분석 요청
+exports.analyzeSession = async (session_id) => {
+    const evidenceData = await chatModel.getEvidenceHarassmentBySession(session_id);
+    const messageData = await chatModel.getMessageHarassmentBySession(session_id);
+
+    // EvidenceHarassment, ChatMessageHarassment이 있는지 확인 (두 테이블이 있어야 둘을 종합한 세션 분석을 할 수 있기 때문에)
+    if (evidenceData.length === 0 || messageData.length === 0) {
+        throw new Error("Both evidence and message harassment analyses must exist to evaluate the session.");
+    }
+
+    // harassment_category_id별 severity 더하기 (harassment_category_id가 같은 EvidenceHarassment, ChatMessageHarassment)
+    const merged = {};
+    for (const record of [...evidenceData, ...messageData]) {
+        const categoryId = record.harassment_category_id;
+        if (!merged[categoryId]) {
+            merged[categoryId] = 0;
+        }
+        merged[categoryId] += record.severity;
+    }
+
+    // harasssment_category_id별 EvidenceHarassment, ChatMessageHarassment을 종합한 SessionEvalHarassment 테이블 생성
+    const sessionEvalHarassmentRecords = Object.entries(merged).map(([categoryId, severity]) => ({
+        harassment_category_id: Number(categoryId),
+        severity
+    }));
+
+    const hasSeverity = sessionEvalHarassmentRecords.some(r => r.severity >= 0); // 심각도가 0과 같거나 크면 '심각성'이 있다고 판단
+    const is_harassment = hasSeverity ? 1 : 0;
+    const should_report = is_harassment;  // 일단은 간단하게 괴롭힘이 맞으면 신고 권장하는 것으로...
+
+    // 유형별 위험성에 따라 weight 부여
+    const harassmentTypeWeights = {
+        SEXUAL: 12, VIOLENCE: 12, CRIME: 12,
+        ABUSE: 9, VERBAL_ATTACK: 9, DISCRIMINATION: 9, HATE: 9,
+        INAPPROPRIATE_HR_ACTION: 9, ECONOMIC_PRESSURE: 9,
+        CENSURE: 6, EXCESSIVE_WORKLOAD: 6, UNFAIR_WORK_ORDERS: 6,
+        WORK_EXCLUSION: 6, OBSTRUCTION_OF_WORK: 6, SOCIAL_ISOLATION: 6
+    };
+
+    const severeTypes = ['SEXUAL', 'VIOLENCE', 'CRIME'];
+    let fixedBoost = 0;
+    const weightedScores = [];    
+
+    for (const record of sessionEvalHarassmentRecords) {
+        const category = await chatModel.getHarassmentCategoryById(record.harassment_category_id);
+        const type = category?.name;
+
+        // severeTypes에 속하면 severity에 따라 점수에 특정 값(fixedBoost)을 더함
+        if (severeTypes.includes(type)) {
+            if (record.severity >= 1) fixedBoost += 50;
+            else if (record.severity === 0) fixedBoost += 35;
+        } else {
+            const type_weight = harassmentTypeWeights[type] || 0;
+            const severity_multiplier = record.severity >= 1 ? 2.5 : // 심각도가 1(명백한 괴롭힘)보다 크면 2.5를 곱함
+                record.severity === 0 ? 1 : // 심각도가 0(불쾌감 유발 가능)이면 1을 곱함
+                0;
+            // sessionEvalHarassment별 type_weight와 severity_weight를 곱한 값을 더함.
+            weightedScores.push(type_weight * severity_multiplier);
+        }
+    }
+
+    // fixedBoost로 더해진 점수를 빼 남은 점수를 구함
+    const maxRemaining = 100 - fixedBoost;
+    const rawWeightSum = weightedScores.reduce((a, b) => a + b, 0); // reduce 함수로 weightedScores의 합을 구함
+    // 100 초과되지 않게 정규화: weightedScores의 각 원소를 maxRemaining / rawWeightSum과 곱한 값의 합
+    const normalizedWeightedSum = rawWeightSum > 0 ? (weightedScores.map(w => w * (maxRemaining / rawWeightSum))).reduce((a, b) => a + b, 0) : 0;
+
+    const risk_score = Math.min(Math.round(fixedBoost + normalizedWeightedSum), 100);  // 100점 만점, 100점이 가장 위험도가 높은 것으로
+
+    // SessionEvalResult 레코드 생성
+    const sessionEvalResultId = await chatModel.insertSessionEvalResult({
+        session_id,
+        risk_score,
+        is_harassment,
+        should_report
+    });
+
+    // SessionEvalHarassment 레코드들 생성 (session_eval_result_id를 fk로 가지므로 SessionEvalResult 생성 후에 만들어짐)
+    for (const record of sessionEvalHarassmentRecords) {
+        await chatModel.insertSessionEvalHarassment({
+            session_eval_result_id: sessionEvalResultId,
+            harassment_category_id: record.harassment_category_id,
+            severity: record.severity
+        });
+    }
+
+    return {
+        session_eval_result_id: sessionEvalResultId,
+        risk_score,
+        is_harassment,
+        should_report,
+        details: sessionEvalHarassmentRecords
+    };
+};
+
+
+
 
 
 // state/step progression까지 될 수 있게 쓴 saveChatMessage, uploadEvidence 함수. 복잡해지고 증거 파일처럼 여러 단계로 필드에 대한 데이터 받아야하는 request에는 오류가 많아서 사용 X

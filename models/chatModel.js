@@ -4,24 +4,18 @@ const db = require('../config/db.js');
 async function insertChatSession(user_id, initialStep, initialState) {
     const started_at = new Date();
 
-    // 1. 세션 생성, session_title은 세션 아이디 받기 전에는 임시 제목(세션 제목 생성 중)으로 설정
+    // 1. 날짜 포맷: YYYY-MM-DD (시간 생략)
+    const dateStr = started_at.toISOString().split('T')[0]; // e.g., "2025-06-13"
+    const session_title = `${dateStr} 채팅`;
+
+    // 2. 세션 생성, session_title은 세션 생성 날짜로
     const [result] = await db.query(
         `INSERT INTO ChatSession (user_id, session_title, started_at, current_step, current_state) 
         VALUES (?, ?, ?, ?, ?)`,
-        [user_id, '세션 제목 생성 중', started_at, initialStep, initialState]
+        [user_id, session_title, started_at, initialStep, initialState]
     );
 
-    const session_id = result.insertId;  // 생성된 session id를 return (insertId 속성으로 INSERT문 실행 후 삽입된 행의 ID를 얻을 수 있음)
-
-    // 2. 세션 제목 "세션 {session_id}"로 업데이트 (session_id에 생성된 session id를 받았으므로)
-    const newTitle = `session ${session_id}`;
-    await db.query(
-        `UPDATE ChatSession
-        SET session_title = ?
-        WHERE chat_session_id = ?`,
-        [newTitle, session_id]
-    );
-    return session_id;
+    return result.insertId;  // 생성된 session id를 return (insertId 속성으로 INSERT문 실행 후 삽입된 행의 ID를 얻을 수 있음)
 }
 
 // 모든 챗봇 대화 세션 fetch
@@ -178,6 +172,7 @@ async function getEvidenceById(evidence_id) {
     return rows[0]; 
 }
 
+// evidence의 ocr_text 업데이트
 async function updateEvidenceOCRText(evidence_id, ocrText) {
     await db.query(
         `UPDATE Evidence SET ocr_text = ? WHERE evidence_id = ?`,
@@ -196,6 +191,102 @@ async function fetchEvidenceBySessionId(session_id) {
     );
     return rows;
 }
+
+// 괴롭힘 유형 name으로 조회
+async function getHarassmentCategoryByName(name) {
+    const [rows] = await db.query(
+        "SELECT * FROM HarassmentCategory WHERE name = ?",
+        [name]
+    );
+    return rows[0];
+}
+
+// 괴롭힘 유형 id로 조회
+async function getHarassmentCategoryById(harassment_category_id) {
+    const [rows] = await db.query(
+        "SELECT * FROM HarassmentCategory WHERE harassment_category_id = ?",
+        [harassment_category_id]
+    );
+    return rows[0];
+}
+
+// EvidenceHarassment 생성
+async function insertEvidenceHarassment({ evidence_id, harassment_category_id, severity, is_harassment }) {
+    await db.query(
+        `INSERT INTO EvidenceHarassment (evidence_id, harassment_category_id, severity, is_harassment)
+        VALUES (?, ?, ?, ?)`,
+        [evidence_id, harassment_category_id, severity, is_harassment]
+    );
+}
+
+
+// session_id로 EvidenceHarassment 조회
+async function getEvidenceHarassmentBySession(session_id) {
+    const [rows] = await db.query(`
+        SELECT eh.harassment_category_id, eh.severity
+        FROM EvidenceHarassment eh
+        JOIN Evidence e ON eh.evidence_id = e.evidence_id
+        WHERE e.chat_session_id = ?
+    `, [session_id]);
+    return rows;
+}
+
+// session_id로 상황 설명하는 내용의 메세지 조회
+async function getDescriptionMessagesBySessionId(session_id) {
+    return await db.query(
+        `SELECT * FROM ChatMessage 
+        WHERE chat_session_id = ? 
+        AND sender = 'user'
+        AND state IN ('prompt_general_description', 'prompt_additional_description')`,
+        [session_id]
+    );
+}
+
+// ChatMessageHarassment 생성
+async function insertChatMessageHarassment({ chat_message_id, harassment_category_id, severity, is_harassment }) {
+    const query = `
+        INSERT INTO ChatMessageHarassment (chat_message_id, harassment_category_id, severity, is_harassment)
+        VALUES (?, ?, ?, ?)
+    `;
+    const values = [chat_message_id, harassment_category_id, severity, is_harassment];
+    await db.query(query, values);
+}
+
+// chat_message_id로 ChatMessage 조회
+async function getChatMessageById(chat_message_id) {
+    const query = `SELECT * FROM ChatMessage WHERE chat_message_id = ?`;
+    const [rows] = await db.query(query, [chat_message_id]);
+    return rows.length > 0 ? rows[0] : null;
+}
+
+// session_id로 ChatMessageHarassment 조회
+async function getMessageHarassmentBySession(session_id) {
+    const [rows] = await db.query(`
+        SELECT mh.harassment_category_id, mh.severity
+        FROM ChatMessageHarassment mh
+        JOIN ChatMessage cm ON mh.chat_message_id = cm.chat_message_id
+        WHERE cm.chat_session_id = ?
+    `, [session_id]);
+    return rows;
+}
+
+
+async function insertSessionEvalHarassment({ session_eval_result_id, harassment_category_id, severity }) {
+    await db.query(`
+        INSERT INTO SessionEvalHarassment (session_eval_result_id, harassment_category_id, severity)
+        VALUES (?, ?, ?)
+    `, [session_eval_result_id, harassment_category_id, severity]);
+}
+
+async function insertSessionEvalResult({ session_id, risk_score, is_harassment, should_report }) {
+    const [result] = await db.query(`
+        INSERT INTO SessionEvalResult (chat_session_id, risk_score, is_harassment, should_report)
+        VALUES (?, ?, ?, ?)
+    `, [session_id, risk_score, is_harassment, should_report]);
+    return result.insertId;
+}
+
+
 
 
 module.exports = {
@@ -216,5 +307,15 @@ module.exports = {
     updateEvidenceDescription,
     getEvidenceById,
     updateEvidenceOCRText,
-    fetchEvidenceBySessionId
+    fetchEvidenceBySessionId,
+    getHarassmentCategoryByName,
+    getHarassmentCategoryById,
+    insertEvidenceHarassment,
+    getEvidenceHarassmentBySession,
+    getDescriptionMessagesBySessionId,
+    insertChatMessageHarassment,
+    getChatMessageById,
+    getMessageHarassmentBySession,
+    insertSessionEvalHarassment,
+    insertSessionEvalResult
 };

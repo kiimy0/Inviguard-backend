@@ -32,7 +32,6 @@ exports.analyzeOCRText = async (req, res) => {
             .filter(s => s.length > 2);             // 너무 짧은 문장 제거
 
         const results = [];
-
         for (const sentence of sentences) {
             const response = await axios.post('http://localhost:8000/analyze', {
                 text: sentence
@@ -40,19 +39,25 @@ exports.analyzeOCRText = async (req, res) => {
 
             const { harassment, types, severity } = response.data;
 
-            /*for (const label of types) {
-                await chatModel.insertEvidenceHarassment({
-                    evidence_id,
-                    category_name: label,
-                    weight: severity
-                });
+           /*// 예측된 괴롭힘 유형들을 EvidenceHarassment table에 저장
+            for (const label of types) {    // 괴롭힘 유형 개수만큼 insert
+                // category_name(label)을 기반으로 HarassmentCategory를 받아옴
+                const category = await chatModel.getHarassmentCategoryByName(label);
+
+                if (category) {
+                    await chatModel.insertEvidenceHarassment({
+                        evidence_id,
+                        harassment_category_id: category.harassment_category_id, // 해당 category의 id
+                        severity: severity,        // 모든 유형 같은 심각도 저장(1문장 -> 1심각도)
+                        is_harassment: harassment // 괴롭힘 여부
+                    });
+                }
             }*/
 
             results.push({ sentence, harassment, types, severity });
         }
 
         res.status(200).json(results);
-
     } catch (err) {
         console.error('Error in model analysis:', err);
         res.status(500).json({ message: 'Model analysis failed' });

@@ -21,6 +21,7 @@ CREATE TABLE ChatMessage (
     sender ENUM('user', 'bot') NOT NULL,
     content TEXT,
     timestamp DATETIME,
+    state VARCHAR(50),
     FOREIGN KEY (chat_session_id) REFERENCES ChatSession(chat_session_id)
 );
 
@@ -46,8 +47,8 @@ CREATE TABLE ChatMessageHarassment (
 	chat_message_harassment_id INT AUTO_INCREMENT PRIMARY KEY,
     chat_message_id INT,
     harassment_category_id INT,
-    weight DOUBLE,
-    state VARCHAR(50),
+    severity DOUBLE,
+    is_harassment BOOLEAN,
     FOREIGN KEY (chat_message_id) REFERENCES ChatMessage(chat_message_id),
     FOREIGN KEY (harassment_category_id) REFERENCES HarassmentCategory(harassment_category_id)
 );
@@ -56,7 +57,8 @@ CREATE TABLE EvidenceHarassment (
 	evidence_harassment_id INT AUTO_INCREMENT PRIMARY KEY,
     evidence_id INT,
     harassment_category_id INT,
-    weight DOUBLE,
+    severity DOUBLE,
+    is_harassment BOOLEAN,
     FOREIGN KEY (evidence_id) REFERENCES Evidence(evidence_id),
     FOREIGN KEY (harassment_category_id) REFERENCES HarassmentCategory(harassment_category_id)
 );
@@ -66,6 +68,7 @@ CREATE TABLE SessionEvalResult (
     chat_session_id INT NOT NULL,
     risk_score INT,
     should_report BOOLEAN,
+    is_harassment BOOLEAN,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (chat_session_id) REFERENCES ChatSession(chat_session_id)
@@ -75,7 +78,8 @@ CREATE TABLE SessionEvalHarassment (
     session_eval_harassment_id INT AUTO_INCREMENT PRIMARY KEY,
     session_eval_result_id INT,
     harassment_category_id INT,
-    weight DOUBLE,
+    severity DOUBLE,
+    is_harassment BOOLEAN,
     FOREIGN KEY (session_eval_result_id) REFERENCES SessionEvalResult(session_eval_result_id),
     FOREIGN KEY (harassment_category_id) REFERENCES HarassmentCategory(harassment_category_id)
 );

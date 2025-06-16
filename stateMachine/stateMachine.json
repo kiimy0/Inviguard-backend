@@ -3,8 +3,7 @@
         "message": "안녕하세요. 저는 InviGuard의 AI 상담 챗봇 이음이에요. 직장에서 힘든 일을 겼으셨다면, 편하게 말씀해 주세요. 제가 천천히 도와드릴게요.",
         "expects": "input_key",
         "transitions": {
-            "yes": "prompt_general_description",
-            "default": "prompt_general_description"
+            "start": "prompt_general_description"
         }
     },
     "prompt_general_description": {
@@ -88,10 +87,13 @@
     },
     "end_evidence_upload": {
         "message": "잘 받았어요! 자료는 안전하게 보관됩니다.",
-        "expects": "none"
+        "expects": "none",
+        "transitions": {
+            "evidence_provided": "review_before_evaluation"
+        }
     },
     "review_before_evaluation": {
-        "message": "지금까지 보내주신 내용으로 바로 사내 괴롭힘 분석을 진행하실 수 있습니다. 더 추가하고 싶으신 내용이 있나요? (사진·음성 증거 더 추가하기 버튼 & 상황 설명 추가로 입력하기 버튼 & 분석 시작하기 버튼)",
+        "message": "지금까지 보내주신 내용으로 바로 사내 괴롭힘 분석을 진행하실 수 있습니다. 더 추가하고 싶으신 내용이 있나요?",
         "expects": "input_key",
         "transitions": {
             "additional_evidence_upload": "wait_file_upload",
