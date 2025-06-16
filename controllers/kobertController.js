@@ -4,42 +4,54 @@ const chatModel = require('../models/chatModel');
 // OCR text 기반으로 kobert_api 호출, result 저장
 exports.analyzeOCRText = async (req, res) => {
     try {
-        // evidence_id 유효성 검사
         const { evidence_id } = req.params;
-        if (!evidence_id) { // 없을 경우 멘트 출력
+        if (!evidence_id) {
             return res.status(400).json({ message: 'evidence_id is required' });
         }
 
-        // DB에서 OCR text 조회
         const evidence = await chatModel.getEvidenceById(evidence_id);
-        if (!evidence || !evidence.ocr_text) {  // 조회 실패
+        if (!evidence || !evidence.ocr_text) {
             return res.status(404).json({ message: 'OCR text not found' });
         }
 
-        // FastAPI KoBERT model 호출 -> OCR text를 FastAPI server에 POST
-        const response = await axios.post('http://localhost:8000/analyze', {
-            text: evidence.ocr_text
-        });
+        // OCR text 문장별로 분리 + 전처리
+        const sentences = evidence.ocr_text
+            .split('\n')                             // 줄 단위 분리
+            .map(line => line.trim())                // 양쪽 공백 제거
+            .filter(line =>
+                line.length > 3 &&
+                !/^\d{1,2}:\d{2}/.test(line) &&                         // 시각 제거
+                !/^[<>\d\s+]+$/.test(line) &&                           // 기호/숫자 제거
+                !/^[가-힣]{2,4}(씨|님)?$/.test(line) &&                  // 이름/호칭 제거
+                !/^(.*)?(부서|팀|부장|과장|대리|사원)(.*)?$/.test(line) && // 직책/조직 정보 제거
+                /[가-힣]/.test(line)                                    // 한글 포함
+            )
+            .join(' ')                              // 줄들을 공백 기준으로 합치기
+            .split(/(?<=[.?!])\s+/)                 // 문장 단위로 분리
+            .map(s => s.trim())                     // 각 문장 앞뒤 공백 제거
+            .filter(s => s.length > 2);             // 너무 짧은 문장 제거
 
-        // result destructuring
-        const { harassment, types, severity } = response.data;
+        const results = [];
 
-        // 예측된 괴롭힘 유형들을 EvidenceHarassment table에 저장
-        for (const label of types) {    // 괴롭힘 유형 개수만큼 insert
-            await chatModel.insertEvidenceHarassment({
-                evidence_id,
-                category_name: label,   // category_name을 기반으로 내부에서 harassment_category_id 매핑
-                weight: severity        // 모든 유형 같은 심각도 저장(1문장 -> 1심각도)
+        for (const sentence of sentences) {
+            const response = await axios.post('http://localhost:8000/analyze', {
+                text: sentence
             });
+
+            const { harassment, types, severity } = response.data;
+
+            /*for (const label of types) {
+                await chatModel.insertEvidenceHarassment({
+                    evidence_id,
+                    category_name: label,
+                    weight: severity
+                });
+            }*/
+
+            results.push({ sentence, harassment, types, severity });
         }
 
-        // client 응답 반환
-        res.status(200).json({
-            message: 'Analysis complete',   // 분석 완료 message
-            harassment,
-            types,
-            severity
-        });
+        res.status(200).json(results);
 
     } catch (err) {
         console.error('Error in model analysis:', err);

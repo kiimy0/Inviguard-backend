@@ -85,7 +85,8 @@ exports.getChatMessages = async (req, res) => {
 exports.uploadEvidence = async (req, res) => {
     try {
         const { session_id } = req.params;
-        const file = req.file;
+        // 1장 업로드
+        /* const file = req.file;
 
         if (!file) {
             return res.status(400).json({ message: 'No file uploaded.' });
@@ -95,8 +96,24 @@ exports.uploadEvidence = async (req, res) => {
             session_id,
             file
         });
+        
+        res.status(201).json(result);*/
 
-        res.status(201).json(result);
+        // 여러장 업로드
+        const files = req.files;
+        
+        if(!files || files.length === 0){
+            return res.status(400).json({ message: 'No file uploaded.' });
+        }
+
+        const results = [];
+        for (const file of files){
+            const result = await chatService.uploadEvidence({session_id, file});
+            results.push(result);
+        }
+
+        res.status(201).json(results);
+
     } catch (error) {
         console.error('Error uploading evidence:', error);
         res.status(500).json({ message: error.message || 'Server error' });
