@@ -322,90 +322,101 @@ exports.getStateInfo = (req, res) => {
 
 // 개별 증거 evidence_description 괴롭힘 분석 요청 (OpenAI API로 분석)
 exports.analyzeEvidenceDescription = async (req, res) => {
-    const evidence_id = req.params.evidence_id;
+    const { evidence_ids } = req.body;
 
-    try {
-        const evidence = await chatModel.getEvidenceById(evidence_id);
-        if (!evidence || !evidence.evidence_description) {
-            return res.status(400).json({ message: 'No valid evidence_description found for analysis.' });
-        }
-
-        const prompt = `
-            다음은 괴롭힘 유형과 설명입니다:
-            - CENSURE: 경멸, 비난, 조롱 표현
-            - HATE: 특정 집단에 대한 혐오
-            - DISCRIMINATION: 차별 정당화 또는 편견 표현
-            - SEXUAL: 성적 대상화, 성희롱, 음란 표현
-            - VIOLENCE: 물리적·심리적 위협, 폭력성
-            - ABUSE: 욕설, 모욕, 감정적 폭력
-            - CRIME: 범죄 행위의 조장 또는 정당화
-            - VERBAL_ATTACK: 비하적 언어, 인신공격
-            - EXCESSIVE_WORKLOAD: 과도한 업무 부과
-            - UNFAIR_WORK_ORDERS: 부당한 업무 지시, 원래 업무 외 지시
-            - WORK_EXCLUSION: 부당한 업무 배제, 따돌림
-            - OBSTRUCTION_OF_WORK: 고의적 업무 방해
-            - INAPPROPRIATE_HR_ACTION: 불합리한 인사조치
-            - ECONOMIC_PRESSURE: 회식비 강요 등 경제적 부담
-            - SOCIAL_ISOLATION: 직장 내 고립, 따돌림
-
-            심각도 등급은 다음과 같습니다:
-            - -1: 특이사항 없음 (문제 없는 일반적인 표현)
-            - 0: 비우호적 표현 (불쾌감 유발 가능)
-            - 1: 괴롭힘 표현 (명백한 괴롭힘)
-
-            아래의 텍스트를 분석하고, 해당 텍스트가 부도덕한지 여부(is_immoral), 괴롭힘 유형(types)의 목록, 심각도(severity)를 반환하세요. 결과는 다음 JSON 형식으로 출력하세요:
-
-            {
-            "is_immoral": 1,
-            "types": ["HATE", "CENSURE"],
-            "severity": 1
-            }
-
-            텍스트: ${evidence.evidence_description}
-        `;
-
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: 'You are a workplace harassment detection assistant.' },
-                { role: 'user', content: prompt }
-            ],
-            temperature: 0.2
-        });
-
-        const resultText = response.choices[0].message.content;
-
-        // OpenAI 답변 parsing
-        let result;
-        try {
-            result = JSON.parse(resultText);
-        } catch (err) {
-            return res.status(500).json({ message: "Failed to parse OpenAI response.", raw: resultText });
-        }
-
-        if (!Array.isArray(result.types)) {
-            return res.status(500).json({ message: "Invalid response: types must be an array", raw: resultText });
-        }
-
-        // 괴롭형 유형별 EvidenceHarassment 테이블에 저장
-        for (const type of result.types) {
-            const category = await chatModel.getHarassmentCategoryByName(type);
-            if (category) {
-                await chatModel.insertEvidenceHarassment({
-                    evidence_id,
-                    harassment_category_id: category.harassment_category_id,
-                    severity: result.severity,
-                    is_harassment: result.is_immoral
-                });
-            }
-        }
-
-        return res.status(200).json(result);
-
-    }  catch (error) {
-        console.error("Error in analyzeEvidenceDescription:", error);
-        res.status(500).json({ message: "Internal server error." });
+    if (!Array.isArray(evidence_ids) || evidence_ids.length === 0) {
+        return res.status(400).json({ message: 'evidence_ids must be a non-empty array.' });
     }
+
+    const promptIntro = `
+        다음은 괴롭힘 유형과 설명입니다:
+        - CENSURE: 경멸, 비난, 조롱 표현
+        - HATE: 특정 집단에 대한 혐오
+        - DISCRIMINATION: 차별 정당화 또는 편견 표현
+        - SEXUAL: 성적 대상화, 성희롱, 음란 표현
+        - VIOLENCE: 물리적·심리적 위협, 폭력성
+        - ABUSE: 욕설, 모욕, 감정적 폭력
+        - CRIME: 범죄 행위의 조장 또는 정당화
+        - VERBAL_ATTACK: 비하적 언어, 인신공격
+        - EXCESSIVE_WORKLOAD: 과도한 업무 부과
+        - UNFAIR_WORK_ORDERS: 부당한 업무 지시, 원래 업무 외 지시
+        - WORK_EXCLUSION: 부당한 업무 배제, 따돌림
+        - OBSTRUCTION_OF_WORK: 고의적 업무 방해
+        - INAPPROPRIATE_HR_ACTION: 불합리한 인사조치
+        - ECONOMIC_PRESSURE: 회식비 강요 등 경제적 부담
+        - SOCIAL_ISOLATION: 직장 내 고립, 따돌림
+
+        심각도 등급은 다음과 같습니다:
+        - -1: 특이사항 없음 (문제 없는 일반적인 표현)
+        - 0: 비우호적 표현 (불쾌감 유발 가능)
+        - 1: 괴롭힘 표현 (명백한 괴롭힘)
+
+        아래의 텍스트를 분석하고, 해당 텍스트가 부도덕한지 여부(is_immoral), 괴롭힘 유형(types)의 목록, 심각도(severity)를 반환하세요. 결과는 다음 JSON 형식으로 출력하세요:
+
+        {
+        "is_immoral": 1,
+        "types": ["HATE", "CENSURE"],
+        "severity": 1
+        }
+    `;
+
+    const results = [];
+
+    for (const evidence_id of evidence_ids) {
+        try {
+            const evidence = await chatModel.getEvidenceById(evidence_id);
+            if (!evidence || !evidence.evidence_description) {
+                return res.status(400).json({ message: 'No valid evidence_description found for analysis.' });
+            }
+            
+            const prompt = `${promptIntro}\n\n텍스트: ${evidence.evidence_description}`;
+
+            const response = await openai.chat.completions.create({
+                model: 'gpt-4',
+                messages: [
+                    { role: 'system', content: 'You are a workplace harassment detection assistant.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.2
+            });
+
+            const resultText = response.choices[0].message.content;
+
+            // OpenAI 답변 parsing
+            let parsed;
+            try {
+                parsed = JSON.parse(resultText);
+            } catch (err) {
+                results.push({ evidence_id, error: "Failed to parse OpenAI response.", raw: resultText});
+                continue;
+            }
+
+            if (!Array.isArray(parsed.types)) {
+                results.push({ evidence_id, error: 'Invalid response: types must be array.', raw: resultText});
+                continue;
+            }
+
+            // 괴롭형 유형별 EvidenceHarassment 테이블에 저장
+            for (const type of parsed.types) {
+                const category = await chatModel.getHarassmentCategoryByName(type);
+                if (category) {
+                    await chatModel.insertEvidenceHarassment({
+                        evidence_id,
+                        harassment_category_id: category.harassment_category_id,
+                        severity: parsed.severity,
+                        is_harassment: parsed.is_immoral
+                    });
+                }
+            }
+
+            results.push({ evidence_id, ...parsed });
+        } catch (err) {
+            console.error(`Error analyzing evidence_id ${evidence_id}:`, err);
+            results.push({ evidence_id, error: 'Unexpected server error'});
+        }
+    }
+
+    return res.status(200).json({ analyzed: results.length, results });
 };
 
 
