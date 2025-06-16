@@ -3,7 +3,6 @@ const app = express();
 require('dotenv').config();
 
 const chatRoutes = require('./routes/chatRoutes');
-const kobertRoutes = require('./routes/kobertRoutes');
 const db = require('./config/db');
 
 // Middleware
@@ -11,7 +10,6 @@ app.use(express.json()); // JSON parsing할 수 있게
 
 // Routes
 app.use('/api/chat', chatRoutes);
-app.use('/api/kobert', kobertRoutes);
 
 // DB connection test
 const testDBConnection = async () => {
