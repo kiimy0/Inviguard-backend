@@ -172,6 +172,15 @@ async function getEvidenceById(evidence_id) {
     return rows[0]; 
 }
 
+// session_id로 evidence 받아옴
+async function getEvidenceBySessionId(session_id) {
+    const [rows] = await db.query(
+        `SELECT * FROM Evidence WHERE chat_session_id = ?`,
+        [session_id]
+    );
+    return rows;
+}
+
 // evidence의 ocr_text 업데이트
 async function updateEvidenceOCRText(evidence_id, ocrText) {
     await db.query(
@@ -286,8 +295,25 @@ async function insertSessionEvalResult({ session_id, risk_score, is_harassment, 
     return result.insertId;
 }
 
+// Report 생성
+async function insertReport({ user_id, chat_session_id, status, evidence_included }) {
+    const submitted_at = new Date();
+    const [result] = await db.query(
+        `INSERT INTO Report (user_id, chat_session_id, submitted_at, status, evidence_included)
+        VALUES (?, ?, ?, ?, ?)`,
+        [user_id, chat_session_id, submitted_at, status, evidence_included]
+    );
+    return result.insertId;
+}
 
-
+// 특정 세션의 report 존재 여부 확인 (중복 방지용)
+async function getReportBySessionId(chat_session_id) {
+    const [rows] = await db.query(
+        `SELECT * FROM Report WHERE chat_session_id = ?`,
+        [chat_session_id]
+    );
+    return rows.length > 0 ? rows[0] : null;
+}
 
 module.exports = {
     insertChatSession,
@@ -306,6 +332,7 @@ module.exports = {
     updateEvidenceTextuality,
     updateEvidenceDescription,
     getEvidenceById,
+    getEvidenceBySessionId,
     updateEvidenceOCRText,
     fetchEvidenceBySessionId,
     getHarassmentCategoryByName,
@@ -317,5 +344,7 @@ module.exports = {
     getChatMessageById,
     getMessageHarassmentBySession,
     insertSessionEvalHarassment,
-    insertSessionEvalResult
+    insertSessionEvalResult,
+    insertReport,
+    getReportBySessionId
 };

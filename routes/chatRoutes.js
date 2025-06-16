@@ -61,4 +61,7 @@ router.post('/analysis/message/openai/:message_id', chatController.analyzeMessag
 // 전체 세션 괴롭힘 분석 요청
 router.post('/analysis/sessions/:session_id', chatController.analyzeSession);
 
+// report 생성
+router.post('/sessions/:session_id/report', chatController.createReport);
+
 module.exports = router;

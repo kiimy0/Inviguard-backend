@@ -256,6 +256,28 @@ exports.analyzeSession = async (session_id) => {
     };
 };
 
+// Report 생성
+exports.createReport = async (session_id, user_id) => {
+    // 이미 생성된 report가 있다면 중복 생성 방지
+    const existing = await chatModel.getReportBySessionId(session_id);
+    if (existing) {
+        throw new Error('A report has already been submitted for this session.');
+    }
+
+    // evidence가 하나라도 있으면 true
+    const evidence = await chatModel.getEvidenceBySessionId(session_id);
+    const evidence_included = evidence.length > 0;
+
+    // 실제 신고 가능한 기능은 생략하므로 status는 'submitted'로 저장
+    const report_id = await chatModel.insertReport({
+        user_id,
+        chat_session_id: session_id,
+        status: 'submitted',
+        evidence_included
+    });
+
+    return { report_id, status: 'submitted', evidence_included };
+};
 
 
 

@@ -490,3 +490,21 @@ exports.analyzeSession = async (req, res) => {
         res.status(500).json({ message: err.message || 'Internal Server Error' });
     }
 };
+
+// report 생성
+exports.createReport = async (req, res) => {
+    const session_id = req.params.session_id;
+    const { user_id } = req.body;
+
+    if (!user_id) {
+        return res.status(400).json({ message: 'user_id is required.' });
+    }
+
+    try {
+        const report = await chatService.createReport(session_id, user_id);
+        res.status(201).json(report);
+    } catch (error) {
+        console.error('Error creating report:', error);
+        res.status(400).json({ message: error.message });
+    }
+};
