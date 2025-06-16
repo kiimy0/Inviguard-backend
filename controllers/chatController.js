@@ -127,14 +127,20 @@ exports.uploadEvidence = async (req, res) => {
 // 증거 파일 is_textual인지 user input받고 저장 (is_textual은 boolean이어야 함)
 exports.updateEvidenceTextuality = async (req, res) => {
     try {
-        const { evidence_id } = req.params;
-        const { is_textual } = req.body;
+        const { evidence_ids, is_textual } = req.body;
+
+        if (!Array.isArray(evidence_ids) || evidence_ids.length === 0) {
+            return res.status(400).json({ message: 'evidence_ids must be a non-empty array.' });
+        }
 
         if (typeof is_textual !== 'boolean') {
             return res.status(400).json({ message: 'is_textual must be a boolean.' });
         }
 
-        await chatModel.updateEvidenceTextuality(evidence_id, is_textual);
+        for (const evidence_id of evidence_ids) {
+            await chatModel.updateEvidenceTextuality(evidence_id, is_textual);
+        }
+
         res.status(200).json({ message: 'Textuality updated successfully.' });
     } catch (error) {
         console.error('Error updating textuality:', error);
@@ -145,14 +151,20 @@ exports.updateEvidenceTextuality = async (req, res) => {
 // 증거 파일 evidence_description user한테 입력받고 저장
 exports.updateEvidenceDescription = async (req, res) => {
     try {
-        const { evidence_id } = req.params;
-        const { evidence_description } = req.body;
+        const { evidence_ids, evidence_description } = req.body;
+
+        if (!Array.isArray(evidence_ids) || evidence_ids.length === 0) {
+            return res.status(400).json({ message: 'evidence_ids must be a non-empty array.' });
+        }
 
         if (!evidence_description || typeof evidence_description !== 'string') {
             return res.status(400).json({ message: 'Valid evidence description is required.' });
         }
 
-        await chatModel.updateEvidenceDescription(evidence_id, evidence_description);
+        for (const evidence_id of evidence_ids) {
+            await chatModel.updateEvidenceDescription(evidence_id, evidence_description);
+        }
+
         res.status(200).json({ message: 'Evidence description updated successfully.' });
     } catch (error) {
         console.error('Error updating evidence description:', error);
@@ -163,31 +175,48 @@ exports.updateEvidenceDescription = async (req, res) => {
 // 이미지 증거 OCR하고 결과 ocr_text필드에 저장
 exports.runOCROnEvidence = async (req, res) => {
     try {
-        const { evidence_id } = req.params;
-        if (!evidence_id) {
-            return res.status(400).json({ message: 'evidence_id is required' });
+        const { evidence_ids } = req.body;
+
+        if (!Array.isArray(evidence_ids) || evidence_ids.length === 0) {
+            return res.status(400).json({ message: 'evidence_ids must be a non-empty array.' });
         }
 
-        // 1. 증거의 file path 찾기
-        const evidence = await chatModel.getEvidenceById(evidence_id);
-        if (!evidence || !evidence.file_path) {
-            return res.status(404).json({ message: 'Evidence not found or file path missing' });
+        const results = [];
+
+        for (const evidence_id of evidence_ids)
+        {
+            try{
+                // 1. 증거의 file path 찾기
+                const evidence = await chatModel.getEvidenceById(evidence_id);
+                if (!evidence || !evidence.file_path) {
+                    results.push({evidence_id, message: 'Evidence not found or file path missing' });
+                    continue;
+                }
+
+                // 2. OCR 실행
+                const text = await runOCR(evidence.file_path);
+                if (!text || text.length === 0) {
+                    results.push({evidence_id, message: 'No text extracted from image.' });
+                    continue;
+                }
+
+                // 3. OCR 결과 DB에 저장
+                await chatModel.updateEvidenceOCRText(evidence_id, text);
+
+                results.push({
+                    evidence_id,
+                    ocr_text: text
+                });
+
+            } catch(err) {
+                console.error(`Error processing OCR for evidence_id ${evidence_id}:`, err);
+                results.push({ evidence_ids, error: err.message });
+            }
         }
-
-        // 2. OCR 실행
-        const text = await runOCR(evidence.file_path);
-        if (!text || text.length === 0) {
-            return res.status(200).json({ message: 'No text extracted from image.' });
-        }
-
-        // 3. OCR 결과 DB에 저장
-        await chatModel.updateEvidenceOCRText(evidence_id, text);
-
-        return res.status(200).json({
-            message: 'OCR successful',
-            ocr_text: text
+        return res.status(200).json({                
+            message: 'OCR successful',                
+            results            
         });
-
     } catch (error) {
         console.error('Error running OCR:', error);
         res.status(500).json({ message: 'OCR failed' });
