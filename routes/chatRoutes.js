@@ -28,19 +28,29 @@ router.patch('/sessions/:session_id/state', chatController.updateCurrentState);
 // 세션 대화 복원
 router.get('/sessions/:session_id/messages', chatController.getChatMessages);
 
-// 증거 파일 제출 (사진/오디오 파일, request 당 하나의 파일만 업로드)
+// 개별 증거 파일 제출 (사진/오디오 파일, request 당 하나의 파일만 업로드)
 // router.post('/sessions/:session_id/evidence', upload.single('file'), chatController.uploadEvidence);
+
+// 개별 증거 파일 is_textual 저장
+// router.put('/evidence/:evidence_id/textuality', chatController.updateEvidenceTextuality);
+
+// 개별 증거 파일 evidence_description 저장
+// router.put('/evidence/:evidence_id/description', chatController.updateEvidenceDescription);
+
+// 개별 이미지 증거 OCR
+// router.put('/evidence/:evidence_id/ocr', chatController.runOCROnEvidence);
+
 // 증거 파일 제출 (여러파일용) -> 임시로 5장 허용
 router.post('/sessions/:session_id/evidence', upload.array('file', 5), chatController.uploadEvidence);
 
 // 증거 파일 is_textual 저장
-router.put('/evidence/:evidence_id/textuality', chatController.updateEvidenceTextuality);
+router.put('/evidence/textuality', chatController.updateEvidenceTextuality);
 
 // 증거 파일 evidence_description 저장
-router.put('/evidence/:evidence_id/description', chatController.updateEvidenceDescription);
+router.put('/evidence/description', chatController.updateEvidenceDescription);
 
 // 이미지 증거 OCR
-router.put('/evidence/:evidence_id/ocr', chatController.runOCROnEvidence);
+router.put('/evidence/ocr', chatController.runOCROnEvidence);
 
 // 특정 세션에 제출된 증거 파일 목록 조회
 router.get('/sessions/:session_id/evidence', chatController.getEvidenceBySession);
